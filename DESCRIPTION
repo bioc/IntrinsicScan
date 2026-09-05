@@ -1,0 +1,41 @@
+Package: IntrinsicScan
+Type: Package
+Title: Label-Blind Feature-Wise Intrinsic Binary Partition Scanning
+Version: 0.99.3
+Authors@R: c(
+    person(
+        "Leandro", "Altare",
+        email = "memedesimo22@gmail.com",
+        role = c("aut", "cre"),
+        comment = c(ORCID = "0009-0004-5861-8679")
+    )
+    )
+Description: Scans continuous molecular features for intrinsic binary partitions
+    using an exact one-dimensional two-medoid objective under L1 loss. Partition
+    discovery uses feature values only and is therefore label-blind. Binary
+    phenotype labels are used only after the partition is fixed to orient the
+    states, quantify phenotype concordance using orientation-free Youden J,
+    perform exact conditional inference, and optionally assess resampling
+    stability or fixed-partition permutation calibration. The method is intended
+    for preprocessed continuous omics measurements and does not claim that a
+    fitted partition demonstrates biological bimodality or discrete biological
+    states.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.6.0)
+Imports:
+    Biobase,
+    S4Vectors,
+    SummarizedExperiment,
+    withr
+Suggests:
+    BiocStyle,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+biocViews: GeneExpression, Microarray, RNASeq, Classification, Clustering
+URL: https://github.com/memedesimo98/IntrinsicScan
+BugReports: https://github.com/memedesimo98/IntrinsicScan/issues
+RoxygenNote: 7.3.2

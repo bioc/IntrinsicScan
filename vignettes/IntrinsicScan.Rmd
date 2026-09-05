@@ -1,0 +1,95 @@
+---
+title: "IntrinsicScan: label-blind feature-wise binary partitioning"
+author: "Leandro Altare"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{IntrinsicScan: label-blind feature-wise binary partitioning}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+# Introduction
+
+`IntrinsicScan` asks a deliberately narrow question for each continuous feature:
+can the feature define its own binary partition without using phenotype labels,
+and how strongly does that fixed partition subsequently concord with a binary
+phenotype?
+
+The partition is the exact optimum of a one-dimensional two-medoid L1 objective.
+Phenotype labels are not available to the partitioning step. Labels are used only
+afterward to orient the low/high states and calculate concordance and inference.
+A high concordance score is not evidence by itself for biological bimodality.
+
+The package is designed for high-throughput continuous molecular measurements
+such as gene-expression data and interoperates with `SummarizedExperiment` and
+`ExpressionSet`. Related label-blind discretization approaches include StepMiner,
+which fits step functions using a squared-error objective. `IntrinsicScan` instead
+uses an L1/medoid objective and explicitly separates intrinsic boundary discovery
+from phenotype concordance, inferential evidence, and resampling stability.
+
+# Installation
+
+After release through Bioconductor, `IntrinsicScan` can be installed with:
+
+```{r installation, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("IntrinsicScan")
+```
+
+# Minimal example
+
+```{r minimal-example}
+library(IntrinsicScan)
+
+x <- rbind(
+    feature_A = c(1, 1.1, 1.2, 1.3, 1.4, 5, 5.1, 5.2, 5.3, 5.4),
+    feature_B = c(1, 2, 3, 2, 3, 2, 3, 4, 3, 4),
+    feature_C = rep(7, 10)
+)
+colnames(x) <- paste0("S", seq_len(ncol(x)))
+y <- rep(c("control", "case"), each = 5)
+
+fit <- intrinsicScan(x, phenotype = y, positive = "case", verbose = FALSE)
+intrinsicResults(fit)
+```
+
+# Bioconductor containers
+
+For a `SummarizedExperiment`, `phenotype` may name a `colData()` column.
+The chosen assay is converted to an in-memory numeric matrix by this first
+prototype. The output is itself a `SummarizedExperiment`.
+
+# Stability
+
+Stability is optional and disabled by default in the public interface because it
+can dominate runtime for genome-wide scans. When enabled, each feature receives
+a deterministic random-number stream derived from the master seed and its feature
+identifier; reranking or reordering other features does not change its resampling
+history. Random-number seeding is scoped locally so that package calls do not
+leave the user's global RNG state altered.
+
+# Interpretation limits
+
+`IntrinsicScan` is not a general clustering algorithm, a supervised cutoff
+optimizer, or a bimodality test. Its characteristic design goal is a conservative,
+gross-outlier-resistant intrinsic binary partition. This can reduce sensitivity
+to genuinely rare expression states.
+
+# References
+
+Sahoo D, Dill DL, Tibshirani R, Plevritis SK (2007). Extracting binary signals
+from microarray time-course data. *Nucleic Acids Research* 35:3705-3712.
+doi:10.1093/nar/gkm284.
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```

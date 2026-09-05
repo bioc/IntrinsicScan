@@ -1,0 +1,7 @@
+export(intrinsicScan)
+export(intrinsicResults)
+export(topIntrinsic)
+export(intrinsicPermutation)
+importFrom(S4Vectors,"metadata<-")
+importFrom(SummarizedExperiment,"rowData<-")
+importFrom(utils,head)
