@@ -43,6 +43,75 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("IntrinsicScan")
 ```
 
+## How the intrinsic partition is defined
+
+For each molecular feature, IntrinsicScan identifies two intrinsic states without
+using phenotype labels to determine the partition.
+
+Let the observed values for one feature, after sorting, be
+
+\[
+x_{(1)} \leq x_{(2)} \leq \cdots \leq x_{(n)}.
+\]
+
+IntrinsicScan considers every admissible split between two distinct adjacent
+values. For a candidate split at position \(k\), the observations are divided
+into a lower state and a higher state, and the within-state L1 loss is
+
+\[
+L(k) =
+\sum_{i \leq k} |x_{(i)} - m_L(k)|
++
+\sum_{i > k} |x_{(i)} - m_H(k)|,
+\]
+
+where \(m_L(k)\) and \(m_H(k)\) are the medoids of the lower and higher states,
+respectively.
+
+The L1 loss is the sum of absolute distances between observations and their
+state medoid. Unlike an L2 or squared-error objective, deviations are therefore
+not squared.
+
+The selected partition is the split that minimizes this total L1 loss:
+
+\[
+k^* = \arg\min_k L(k).
+\]
+
+The threshold is placed halfway between the two adjacent observed values that
+define the selected split.
+
+Importantly, phenotype labels are not used during this optimization. The low and
+high states are therefore determined entirely from the observed values of the
+feature. Only after the partition has been fixed are phenotype labels used to
+assess concordance.
+
+For a fixed partition, IntrinsicScan evaluates phenotype concordance using the
+orientation-free Youden index
+
+\[
+J = |\mathrm{TPR}_{high} - \mathrm{FPR}_{high}|.
+\]
+
+After orienting the two states so that the state more associated with the
+phenotype-positive class is treated as positive, this is equivalent to
+
+\[
+J = \mathrm{sensitivity} + \mathrm{specificity} - 1.
+\]
+
+Thus, \(J = 0\) indicates no concordance between the intrinsic partition and the
+phenotype, whereas \(J = 1\) indicates perfect concordance in the analyzed
+samples.
+
+Statistical significance is assessed after the partition is fixed. Conditional
+on the numbers of phenotype-positive samples, phenotype-negative samples and
+samples assigned to the high state, the number of phenotype-positive samples in
+the high state follows a hypergeometric distribution under exchangeable
+phenotype labels. `exact_J_p` is the exact probability of obtaining an
+orientation-free \(J\) at least as large as the observed value under this
+conditional null model.
+
 # Minimal example
 
 ```{r minimal-example}
