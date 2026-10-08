@@ -1,7 +1,7 @@
 Package: IntrinsicScan
 Type: Package
 Title: Label-Blind Feature-Wise Intrinsic Binary Partition Scanning
-Version: 0.99.3
+Version: 0.99.4
 Authors@R: c(
     person(
         "Leandro", "Altare",
@@ -11,14 +11,18 @@ Authors@R: c(
     )
     )
 Description: Scans continuous molecular features for intrinsic binary partitions
-    using an exact one-dimensional two-medoid objective under L1 loss. Partition
-    discovery uses feature values only and is therefore label-blind. Binary
-    phenotype labels are used only after the partition is fixed to orient the
-    states, quantify phenotype concordance using orientation-free Youden J,
-    perform exact conditional inference, and optionally assess resampling
-    stability or fixed-partition permutation calibration. The method is intended
-    for preprocessed continuous omics measurements and does not claim that a
-    fitted partition demonstrates biological bimodality or discrete biological
+    without using phenotype labels to determine the split. For each feature,
+    observations are divided into two one-dimensional states by selecting the
+    split that minimizes the total within-state L1 loss, defined here as the sum
+    of absolute distances between each observation and the medoid of its assigned
+    state. Thus, unlike an L2 or squared-error objective, deviations are measured
+    by their absolute magnitude rather than being squared. Binary phenotype
+    labels are used only after the partition is fixed to orient the two states,
+    quantify phenotype concordance using orientation-free Youden J, perform exact
+    conditional inference, and optionally assess resampling stability or
+    fixed-partition permutation calibration. The method is intended for
+    preprocessed continuous omics measurements and does not imply that a fitted
+    partition represents true biological bimodality or discrete biological
     states.
 License: MIT + file LICENSE
 Encoding: UTF-8
