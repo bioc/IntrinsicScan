@@ -5,10 +5,12 @@
 
 #' Scan features for intrinsic binary partitions
 #'
-#' `intrinsicScan()` is the Bioconductor-facing interface to the frozen v11
-#' label-blind partitioning engine. For each feature, it fits the exact global
-#' optimum of a one-dimensional two-medoid L1 objective using feature values
-#' only. Phenotype labels are used only after that partition has been fixed.
+#' `intrinsicScan()` identifies intrinsic binary partitions in continuous
+#' molecular features without using phenotype labels to determine the split.
+#' For each feature, it finds the exact global optimum of a one-dimensional
+#' two-medoid L1 objective, where L1 loss is the sum of absolute distances
+#' between observations and the medoid of their assigned state. Phenotype
+#' labels are used only after the partition has been fixed.
 #'
 #' @param x A numeric matrix/data.frame with features in rows and samples in
 #'   columns, a `SummarizedExperiment`, or an `ExpressionSet`.
@@ -30,14 +32,46 @@
 #'   assay `"state"` in the returned object.
 #' @param verbose Logical; print progress messages.
 #'
-#' @return A `SummarizedExperiment`. The analyzed expression matrix is stored in
-#'   assay `"expression"`; optional high-state assignments are stored in assay
-#'   `"state"`. Features are ordered by the frozen v11 ranking. Scan statistics
-#'   are available through `intrinsicResults()` and are also appended to
-#'   `rowData()` with prefix `scan_`.
+#' @return A `SummarizedExperiment` containing the analyzed molecular features
+#'   in assay `"expression"`, reordered according to the IntrinsicScan ranking.
+#'   Features are ranked first by decreasing orientation-free Youden J, then by
+#'   increasing Benjamini-Hochberg-adjusted exact-J P value, and finally by
+#'   decreasing relative gap between the fitted low and high states. If
+#'   `keepStates = TRUE`, logical high-state assignments are stored in assay
+#'   `"state"`. Feature-level scan statistics are appended to `rowData()` with
+#'   prefix `scan_` and can also be retrieved without the prefix using
+#'   `intrinsicResults()`.
 #'
-#' @details No normalization, transformation, missing-value imputation, or
-#' feature filtering is performed. Inputs must be complete, finite,
+#' @details
+#' For each feature independently, the observed values are sorted and every
+#' admissible split between two distinct adjacent values is considered. Each
+#' candidate split defines a low and a high state. Its L1 loss is the sum of
+#' the absolute distances between each observation and the medoid of its
+#' assigned state, and the split with the minimum total L1 loss is selected.
+#' The fitted threshold is placed halfway between the two adjacent observed
+#' values defining the selected split. If more than one split has the same
+#' optimum within numerical tolerance, ties are resolved deterministically,
+#' first by preferring the largest gap between adjacent states and then the
+#' split closest to the middle of the ordered observations.
+#'
+#' Phenotype labels do not participate in fitting the partition. They are used
+#' only after the partition has been fixed to determine which state is more
+#' associated with the phenotype-positive class and to quantify concordance.
+#' Concordance is measured by the orientation-free Youden index
+#' \eqn{J = |TPR_{high} - FPR_{high}|}, equivalent after orientation to
+#' \eqn{J = sensitivity + specificity - 1}. Thus, \eqn{J = 0} indicates no
+#' phenotype concordance and \eqn{J = 1} indicates perfect concordance in the
+#' analyzed samples.
+#'
+#' The primary exact-J P value is calculated conditionally on the numbers of
+#' phenotype-positive samples, phenotype-negative samples, and samples assigned
+#' to the high state. Under exchangeable phenotype labels, the number of
+#' phenotype-positive samples in the high state follows a hypergeometric
+#' distribution. Multiple-testing correction is performed using the
+#' Benjamini-Hochberg procedure.
+#'
+#' No normalization, transformation, missing-value imputation, or feature
+#' filtering is performed. Inputs must therefore be complete, finite,
 #' preprocessed continuous measurements. A high phenotype-concordance score
 #' does not by itself establish bimodality or discrete biological states.
 #'
@@ -128,7 +162,11 @@ intrinsicScan <- function(x,
 
 #' Extract IntrinsicScan feature results
 #' @param x A result returned by `intrinsicScan()`.
-#' @return An `S4Vectors::DataFrame`, ordered by the frozen v11 ranking.
+#' @return An `S4Vectors::DataFrame` with one row per analyzed feature,
+#'   ordered by decreasing orientation-free Youden J, increasing
+#'   Benjamini-Hochberg-adjusted exact-J P value, and decreasing relative gap.
+#'   Columns describe the fitted intrinsic partition, phenotype concordance,
+#'   statistical evidence, ranking, and, when requested, resampling stability.
 #' @examples
 #' x <- rbind(
 #'   feature_A = c(1, 1.1, 1.2, 1.3, 1.4, 5, 5.1, 5.2, 5.3, 5.4),
