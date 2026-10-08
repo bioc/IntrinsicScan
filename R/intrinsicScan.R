@@ -167,6 +167,98 @@ intrinsicScan <- function(x,
 #'   Benjamini-Hochberg-adjusted exact-J P value, and decreasing relative gap.
 #'   Columns describe the fitted intrinsic partition, phenotype concordance,
 #'   statistical evidence, ranking, and, when requested, resampling stability.
+#' @section Result columns:
+#' The table returned by `intrinsicResults()` contains one row per analyzed
+#' feature. Columns are grouped conceptually as follows.
+#'
+#' **Feature and partition definition**
+#'
+#' - `feature_id`: feature identifier.
+#' - `valid`: whether a valid two-state partition could be fitted.
+#' - `reason`: reason a feature could not be partitioned, if applicable.
+#' - `threshold`: midpoint between the two adjacent observed values defining
+#'   the selected low/high split.
+#' - `low_medoid`, `high_medoid`: medoids of the fitted low and high states.
+#' - `medoid_distance`: difference between the high- and low-state medoids.
+#' - `gap`: distance between the two adjacent observations on either side of
+#'   the selected threshold.
+#' - `relative_gap`: `gap` divided by the feature interquartile range (IQR);
+#'   `NA` when the IQR is zero or non-finite.
+#' - `within_l1_cost`: minimized total within-state L1 loss, i.e. the sum of
+#'   absolute distances between observations and their assigned state medoid.
+#' - `high_state_size`: number of samples assigned to the fitted high state.
+#'
+#' **Phenotype concordance**
+#'
+#' - `J`: orientation-free Youden index. Values range from 0 to 1, with larger
+#'   values indicating stronger concordance between the intrinsic partition and
+#'   phenotype labels.
+#' - `balanced_accuracy`: mean of sensitivity and specificity after orienting
+#'   the fitted states relative to the phenotype-positive class.
+#' - `sensitivity`: sensitivity after post-hoc orientation of the states.
+#' - `specificity`: specificity after post-hoc orientation of the states.
+#' - `accuracy`: fraction of samples correctly classified after orientation.
+#' - `positive_state`: `"high"` or `"low"`, indicating which fitted state is
+#'   associated with the phenotype-positive class.
+#' - `exact_full_concordance`: whether the fixed partition achieves both
+#'   sensitivity and specificity equal to 1 within numerical tolerance.
+#'
+#' **Statistical evidence and descriptive benchmarks**
+#'
+#' - `exact_J_p`: exact conditional P value for the observed orientation-free
+#'   J, conditioning on phenotype class sizes and fitted high-state size.
+#' - `exact_J_fdr`: Benjamini-Hochberg-adjusted `exact_J_p`; this is the primary
+#'   multiple-testing-adjusted inferential quantity used by IntrinsicScan.
+#' - `fisher_p`, `fisher_fdr`: two-sided Fisher exact-test P value for the
+#'   fixed state-by-phenotype table and its Benjamini-Hochberg adjustment.
+#'   These are retained as familiar benchmarks rather than as the primary test.
+#' - `orientation_free_auc`: `max(AUC, 1 - AUC)`, so values range from 0.5 to 1
+#'   independently of whether higher or lower feature values correspond to the
+#'   phenotype-positive class.
+#' - `wilcox_p`, `wilcox_fdr`: Wilcoxon rank-sum P value comparing feature
+#'   values between phenotype classes and its Benjamini-Hochberg adjustment;
+#'   these are retained as distributional benchmarks.
+#' - `median_difference_positive_minus_negative`: phenotype-positive median
+#'   minus phenotype-negative median.
+#' - `rank_J`: feature rank based on decreasing J, then increasing exact-J FDR,
+#'   then decreasing relative gap.
+#'
+#' **Optional resampling-stability summaries**
+#'
+#' These columns are `NA` for features not selected for stability assessment.
+#'
+#' - `stability_seed`: deterministic feature-specific random seed used for
+#'   resampling.
+#' - `n_resamples_valid`: number of requested resamples in which a valid
+#'   training partition could be fitted.
+#' - `n_heldout_valid`: number of resamples in which held-out samples from both
+#'   phenotype classes were available and a held-out J could be calculated.
+#' - `threshold_median`: median fitted threshold across valid resamples.
+#' - `threshold_q025`, `threshold_q975`: 2.5th and 97.5th percentiles of fitted
+#'   thresholds across valid resamples.
+#' - `threshold_iqr`: interquartile range of fitted thresholds across valid
+#'   resamples.
+#' - `threshold_iqr_scaled`: threshold IQR divided by the full-sample feature
+#'   IQR.
+#' - `median_training_J`: median training-set J across valid resamples.
+#' - `median_heldout_J`: median J obtained after applying the training-derived
+#'   threshold and phenotype orientation to held-out samples.
+#' - `heldout_J_q25`, `heldout_J_q75`: 25th and 75th percentiles of held-out J.
+#' - `heldout_J_q025`, `heldout_J_q975`: 2.5th and 97.5th percentiles of
+#'   held-out J.
+#' - `positive_state_stability`: fraction of valid resamples in which the
+#'   training-derived phenotype-positive state agrees with the full-sample
+#'   orientation.
+#' - `state_partition_stability`: mean agreement between resample-derived
+#'   high/low state assignments and the full-sample state partition when the
+#'   resample-derived threshold is applied to all original samples.
+#' - `exact_training_fraction`: fraction of valid resamples with training
+#'   J equal to 1 within numerical tolerance.
+#' - `exact_heldout_fraction`: fraction of valid held-out evaluations with
+#'   held-out J equal to 1 within numerical tolerance.
+#' - `median_heldout_n_positive`, `median_heldout_n_negative`: median numbers
+#'   of phenotype-positive and phenotype-negative samples contributing to
+#'   valid held-out evaluations.
 #' @examples
 #' x <- rbind(
 #'   feature_A = c(1, 1.1, 1.2, 1.3, 1.4, 5, 5.1, 5.2, 5.3, 5.4),
