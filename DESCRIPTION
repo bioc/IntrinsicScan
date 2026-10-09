@@ -43,4 +43,5 @@ Config/testthat/edition: 3
 biocViews: GeneExpression, Microarray, RNASeq, Classification, Clustering
 URL: https://github.com/memedesimo98/IntrinsicScan
 BugReports: https://github.com/memedesimo98/IntrinsicScan/issues
-RoxygenNote: 7.3.2
+Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.1
