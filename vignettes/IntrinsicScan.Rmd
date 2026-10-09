@@ -21,10 +21,12 @@ can the feature define its own binary partition without using phenotype labels,
 and how strongly does that fixed partition subsequently concord with a binary
 phenotype?
 
-The partition is the exact optimum of a one-dimensional two-medoid L1 objective.
-Phenotype labels are not available to the partitioning step. Labels are used only
-afterward to orient the low/high states and calculate concordance and inference.
-A high concordance score is not evidence by itself for biological bimodality.
+The partition is the exact optimum of a one-dimensional two-medoid L1 objective,
+where L1 loss is the sum of absolute distances between observations and the
+medoid of their assigned state. Phenotype labels are not available to the
+partitioning step. Labels are used only afterward to orient the low/high states
+and calculate concordance and inference. A high concordance score is not
+evidence by itself for biological bimodality.
 
 The package is designed for high-throughput continuous molecular measurements
 such as gene-expression data and interoperates with `SummarizedExperiment` and
@@ -43,9 +45,9 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("IntrinsicScan")
 ```
 
-## How the intrinsic partition is defined
+# How the intrinsic partition is defined
 
-For each molecular feature, IntrinsicScan identifies two intrinsic states without
+For each molecular feature, `IntrinsicScan` identifies two intrinsic states without
 using phenotype labels to determine the partition.
 
 Let the observed values for one feature, after sorting, be
@@ -54,7 +56,7 @@ Let the observed values for one feature, after sorting, be
 x_{(1)} \leq x_{(2)} \leq \cdots \leq x_{(n)}.
 \]
 
-IntrinsicScan considers every admissible split between two distinct adjacent
+`IntrinsicScan` considers every admissible split between two distinct adjacent
 values. For a candidate split at position \(k\), the observations are divided
 into a lower state and a higher state, and the within-state L1 loss is
 
@@ -79,14 +81,17 @@ k^* = \arg\min_k L(k).
 \]
 
 The threshold is placed halfway between the two adjacent observed values that
-define the selected split.
+define the selected split. If several candidate splits have the same optimum
+within numerical tolerance, ties are resolved deterministically by first
+preferring the largest gap between the two states and, if necessary, the split
+closest to the middle of the ordered observations.
 
 Importantly, phenotype labels are not used during this optimization. The low and
 high states are therefore determined entirely from the observed values of the
 feature. Only after the partition has been fixed are phenotype labels used to
 assess concordance.
 
-For a fixed partition, IntrinsicScan evaluates phenotype concordance using the
+For a fixed partition, `IntrinsicScan` evaluates phenotype concordance using the
 orientation-free Youden index
 
 \[
@@ -104,13 +109,18 @@ Thus, \(J = 0\) indicates no concordance between the intrinsic partition and the
 phenotype, whereas \(J = 1\) indicates perfect concordance in the analyzed
 samples.
 
-Statistical significance is assessed after the partition is fixed. Conditional
-on the numbers of phenotype-positive samples, phenotype-negative samples and
-samples assigned to the high state, the number of phenotype-positive samples in
-the high state follows a hypergeometric distribution under exchangeable
-phenotype labels. `exact_J_p` is the exact probability of obtaining an
-orientation-free \(J\) at least as large as the observed value under this
-conditional null model.
+Statistical significance is assessed only after the partition is fixed.
+Conditional on the numbers of phenotype-positive samples, phenotype-negative
+samples and samples assigned to the high state, the number of phenotype-positive
+samples in the high state follows a hypergeometric distribution under
+exchangeable phenotype labels. `exact_J_p` is the exact probability of obtaining
+an orientation-free \(J\) at least as large as the observed value under this
+conditional null model. `exact_J_fdr` is the Benjamini-Hochberg-adjusted value
+across the analyzed features.
+
+Features are ranked primarily by decreasing \(J\), with increasing `exact_J_fdr`
+and decreasing `relative_gap` used as successive tie breakers. These quantities
+remain separate result axes rather than being combined into a composite score.
 
 # Minimal example
 
@@ -125,37 +135,262 @@ x <- rbind(
 colnames(x) <- paste0("S", seq_len(ncol(x)))
 y <- rep(c("control", "case"), each = 5)
 
-fit <- intrinsicScan(x, phenotype = y, positive = "case", verbose = FALSE)
-intrinsicResults(fit)
+fit <- intrinsicScan(
+    x,
+    phenotype = y,
+    positive = "case",
+    verbose = FALSE
+)
+
+res <- intrinsicResults(fit)
+
+res[, c(
+    "feature_id",
+    "valid",
+    "reason",
+    "threshold",
+    "low_medoid",
+    "high_medoid",
+    "J",
+    "positive_state",
+    "exact_J_p",
+    "exact_J_fdr",
+    "relative_gap"
+)]
 ```
+
+The returned table contains one row per analyzed feature. The columns shown
+above summarize the fitted intrinsic partition and its subsequent relationship
+with the phenotype.
+
+`feature_A` illustrates a feature with a clear intrinsic low/high partition that
+also aligns perfectly with the phenotype in this small example. Its threshold is
+determined from the feature values alone; the phenotype labels are used only
+afterward to quantify concordance.
+
+`feature_B` also admits an intrinsic two-state partition, but the resulting states
+are less concordant with the phenotype. This distinction is central to the
+method: `IntrinsicScan` does not ask whether the phenotype can be used to create
+a good split, but whether a split discovered independently of the phenotype
+subsequently aligns with it.
+
+`feature_C` is constant and therefore cannot define a valid two-state partition.
+It is retained in the result with `valid = FALSE`, and `reason` describes why the
+partition could not be fitted.
+
+For an initial interpretation, the most useful columns are:
+
+- `threshold`: the boundary separating the fitted low and high states;
+- `low_medoid` and `high_medoid`: representative observed values of the two
+  fitted states;
+- `J`: the orientation-free Youden index describing phenotype concordance,
+  ranging from 0 for no concordance to 1 for perfect concordance;
+- `positive_state`: whether the phenotype-positive class is associated with the
+  fitted high or low state;
+- `exact_J_p` and `exact_J_fdr`: exact conditional statistical evidence for the
+  observed concordance and its multiple-testing-adjusted value;
+- `relative_gap`: the distance between the two observations surrounding the
+  fitted threshold, scaled by the feature interquartile range.
+
+The complete set of returned variables, including optional resampling-stability
+summaries, is documented in `?intrinsicResults`.
+
+# Output data structure
+
+`intrinsicScan()` returns a `SummarizedExperiment`. The analyzed measurements are
+stored in assay `"expression"`, with rows reordered according to the
+`IntrinsicScan` ranking. By default, fitted high/low state assignments are also
+retained as the logical assay `"state"`.
+
+```{r output-structure}
+SummarizedExperiment::assayNames(fit)
+
+rd <- SummarizedExperiment::rowData(fit)
+rd[, c(
+    "scan_feature_id",
+    "scan_threshold",
+    "scan_J",
+    "scan_exact_J_fdr",
+    "scan_rank_J"
+)]
+```
+
+Feature-level results are appended to `rowData()` with the prefix `scan_`. The
+same results can be obtained without this prefix using `intrinsicResults()`.
+The original sample metadata are retained in `colData()`, together with
+`IntrinsicScanLabel`, which records the phenotype labels used for the scan.
+
+Additional analysis metadata, including the positive and negative phenotype
+labels, analysis parameters, result table, and optional resampling details, are
+stored in the `IntrinsicScan` entry of `metadata()`.
+
+```{r metadata-structure}
+names(S4Vectors::metadata(fit)$IntrinsicScan)
+```
+
+This organization keeps the fitted partitions, input measurements, sample
+annotations and feature-level statistics aligned in a standard Bioconductor
+container.
 
 # Bioconductor containers
 
-For a `SummarizedExperiment`, `phenotype` may name a `colData()` column.
-The chosen assay is converted to an in-memory numeric matrix by this first
-prototype. The output is itself a `SummarizedExperiment`.
+For a `SummarizedExperiment`, `phenotype` may either be supplied directly or name
+a column in `colData()`. The `assay` argument selects the assay to analyze.
+
+For an `ExpressionSet`, `phenotype` may similarly name a column in `pData()`, and
+the expression matrix is obtained from `exprs()`.
+
+`IntrinsicScan` currently converts the selected measurements to an in-memory
+numeric matrix before analysis. No normalization, transformation, imputation, or
+feature filtering is performed by the package, so the supplied measurements must
+already be appropriately preprocessed and finite.
+
+# Biological example: AML versus non-leukemic bone marrow
+
+The minimal example above is useful for understanding the mechanics of the
+method but is intentionally artificial. A more realistic application can be
+illustrated using the Bioconductor experiment-data package `leukemiasEset`.
+
+`leukemiasEset` contains RMA-normalized microarray expression measurements from
+60 bone-marrow samples representing acute lymphoblastic leukemia (ALL), acute
+myeloid leukemia (AML), chronic lymphocytic leukemia (CLL), chronic myeloid
+leukemia (CML), and non-leukemic bone marrow (NoL), with 12 samples in each
+group. The data are represented as an `ExpressionSet` with 20,172 Ensembl-level
+features.
+
+Because `IntrinsicScan` operates on a binary phenotype, here we restrict the
+dataset to AML and NoL samples. For vignette speed, the example uses the first
+1,000 features in their original dataset order; this deterministic subset is not
+selected using the phenotype labels. A research analysis would ordinarily scan
+all features that pass the analyst's prespecified preprocessing and quality-control
+criteria.
+
+The biological question in this example is therefore: which gene-expression
+features in this real dataset contain an intrinsic two-state expression boundary,
+discovered without using the diagnostic labels, that subsequently aligns with
+AML versus non-leukemic bone marrow?
+
+```{r biological-example, message=FALSE}
+library(leukemiasEset)
+data("leukemiasEset")
+
+keep <- leukemiasEset$LeukemiaType %in% c("AML", "NoL")
+aml_nol <- leukemiasEset[, keep]
+aml_nol <- aml_nol[seq_len(min(1000L, nrow(aml_nol))), ]
+
+table(as.character(aml_nol$LeukemiaType))
+
+bio_fit <- intrinsicScan(
+    aml_nol,
+    phenotype = "LeukemiaType",
+    positive = "AML",
+    nResamples = 0L,
+    keepStates = FALSE,
+    verbose = FALSE
+)
+
+bio_res <- intrinsicResults(bio_fit)
+
+utils::head(
+    bio_res[, c(
+        "feature_id",
+        "threshold",
+        "J",
+        "positive_state",
+        "exact_J_p",
+        "exact_J_fdr",
+        "relative_gap"
+    )],
+    10
+)
+```
+
+The first rows correspond to features whose independently fitted intrinsic
+partitions show the strongest concordance with AML versus NoL according to the
+package ranking. A high-ranking feature therefore has two distinct properties:
+its low/high boundary was obtained without using the diagnostic labels, and the
+resulting fixed partition subsequently showed strong phenotype concordance.
+
+The fitted threshold of the top-ranked valid feature can also be visualized
+against the two phenotype groups:
+
+```{r biological-example-plot}
+top_id <- as.character(bio_res$feature_id[which(bio_res$valid)[1]])
+top_threshold <- bio_res$threshold[match(top_id, bio_res$feature_id)]
+top_values <- Biobase::exprs(aml_nol)[top_id, ]
+
+group <- factor(
+    as.character(aml_nol$LeukemiaType),
+    levels = c("NoL", "AML")
+)
+
+boxplot(
+    top_values ~ group,
+    xlab = "Phenotype",
+    ylab = "Expression",
+    main = paste("Top IntrinsicScan feature:", top_id)
+)
+abline(h = top_threshold, lty = 2)
+```
+
+The horizontal line is the threshold discovered from the feature values before
+the AML/NoL labels were used for concordance assessment.
+
+This example demonstrates the workflow and interpretation of an `IntrinsicScan`
+result; it is not intended as independent validation of a leukemia biomarker.
+The same samples are used to discover the intrinsic partition and to assess its
+phenotype concordance. Independent datasets or appropriately designed validation
+analyses are required for biological or clinical claims.
 
 # Stability
 
-Stability is optional and disabled by default in the public interface because it
-can dominate runtime for genome-wide scans. When enabled, each feature receives
-a deterministic random-number stream derived from the master seed and its feature
-identifier; reranking or reordering other features does not change its resampling
-history. Random-number seeding is scoped locally so that package calls do not
-leave the user's global RNG state altered.
+Stability assessment is optional and disabled by default in the public interface
+because it can dominate runtime for genome-wide scans.
+
+When enabled, partitions are repeatedly fitted in resampled training data and
+the resulting thresholds and phenotype orientations are evaluated both in the
+training observations and, when available, in held-out observations.
+`IntrinsicScan` reports threshold variability, training and held-out \(J\),
+orientation stability, partition stability, and the fractions of resamples
+showing exact concordance.
+
+Each feature receives a deterministic random-number stream derived from the
+master seed and its feature identifier. Consequently, reranking or reordering
+other features does not change that feature's resampling history. Random-number
+seeding is scoped locally so that package calls do not leave the user's global
+RNG state altered.
 
 # Interpretation limits
 
 `IntrinsicScan` is not a general clustering algorithm, a supervised cutoff
-optimizer, or a bimodality test. Its characteristic design goal is a conservative,
-gross-outlier-resistant intrinsic binary partition. This can reduce sensitivity
-to genuinely rare expression states.
+optimizer, or a formal test of bimodality. The intrinsic partition and
+phenotype-concordance assessment answer distinct questions and should be
+interpreted separately.
+
+A strong \(J\) indicates that the fixed intrinsic partition aligns with the
+supplied binary phenotype in the analyzed samples. It does not establish that
+the feature has two biologically discrete states, that the association is causal,
+or that it will generalize to independent data.
+
+The L1/medoid objective is designed to provide a conservative,
+gross-outlier-resistant intrinsic binary partition. This design can reduce
+sensitivity to genuinely rare expression states.
 
 # References
 
 Sahoo D, Dill DL, Tibshirani R, Plevritis SK (2007). Extracting binary signals
 from microarray time-course data. *Nucleic Acids Research* 35:3705-3712.
 doi:10.1093/nar/gkm284.
+
+Aibar S, Fontanillo C, De Las Rivas J. `leukemiasEset`: Leukemia's microarray
+gene expression data (`ExpressionSet`). Bioconductor experiment-data package.
+doi:10.18129/B9.bioc.leukemiasEset.
+
+Haferlach T, Kohlmann A, Wieczorek L, et al. (2010). Clinical utility of
+microarray-based gene expression profiling in the diagnosis and
+subclassification of leukemia: report from the International Microarray
+Innovations in Leukemia Study Group. *Journal of Clinical Oncology* 28:2529-2537.
+doi:10.1200/JCO.2009.23.4732.
 
 # Session information
 
