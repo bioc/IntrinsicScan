@@ -1,7 +1,15 @@
 \name{intrinsicPermutation}
 \alias{intrinsicPermutation}
 \title{Fixed-partition permutation calibration}
-\usage{intrinsicPermutation(x, nPermutations = 1000L, cutoffs = c(0.8, 1), seed = 1L, verbose = TRUE)}
+\usage{
+intrinsicPermutation(
+  x,
+  nPermutations = 1000L,
+  cutoffs = c(0.8, 1),
+  seed = 1L,
+  verbose = TRUE
+)
+}
 \arguments{
 \item{x}{An IntrinsicScan result created with keepStates=TRUE.}
 \item{nPermutations}{Number of label permutations.}
