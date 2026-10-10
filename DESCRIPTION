@@ -15,8 +15,8 @@ Description: Scans continuous molecular features for intrinsic binary partitions
     observations are divided into two one-dimensional states by selecting the
     split that minimizes the total within-state L1 loss, defined here as the sum
     of absolute distances between each observation and the medoid of its assigned
-    state. Thus, unlike an L2 or squared-error objective, deviations are measured
-    by their absolute magnitude rather than being squared. Binary phenotype
+    state. Thus, unlike a squared-error objective, deviations are measured
+    according to their absolute magnitude rather than being squared. Binary phenotype
     labels are used only after the partition is fixed to orient the two states,
     quantify phenotype concordance using orientation-free Youden J, perform exact
     conditional inference, and optionally assess resampling stability or
