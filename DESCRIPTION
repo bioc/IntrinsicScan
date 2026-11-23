@@ -1,7 +1,7 @@
 Package: IntrinsicScan
 Type: Package
 Title: Label-Blind Feature-Wise Intrinsic Binary Partition Scanning
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: c(
     person(
         "Leandro", "Altare",
